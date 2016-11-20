@@ -3,9 +3,9 @@
 const BOARD_WIDTH = 640;
 const BOARD_HEIGHT = 480;
 
-var game = new Phaser.Game(BOARD_WIDTH, BOARD_HEIGHT, Phaser.AUTO, 'game');
+const game = new Phaser.Game(BOARD_WIDTH, BOARD_HEIGHT, Phaser.AUTO, 'game');
 
-var PhaserGame = function (game) {
+const PhaserGame = function (game) {
     this.map = null;
     this.layer = null;
     this.car = null;
@@ -16,15 +16,9 @@ var PhaserGame = function (game) {
 
     this.current = Phaser.DOWN;
 
-    this.turnPoint = new Phaser.Point();
-
     this.stopPoints = [];
 
     this.gridsize = 32;
-
-    this.turnTile = 2;
-    this.wallTile = 20;
-    this.wall = 20;
 };
 
 PhaserGame.prototype = {
@@ -43,9 +37,7 @@ PhaserGame.prototype = {
         this.map = this.add.tilemap('map');
         this.map.addTilesetImage('tiles', 'tiles');
 
-        this.layer = this.map.createLayer('Tile Layer 1');
-
-        this.map.setCollision(this.wall, true, this.layer);
+        this.layer = this.map.createLayer('Tile Layer 2');
 
         this.car = this.add.sprite(48, 48, 'car');
         this.car.anchor.set(0.5);
@@ -141,8 +133,8 @@ PhaserGame.prototype = {
 
     detectStopPoint: function (tiles) {
         for (let tile of tiles) {
-            if (tile.index === this.wallTile) return null;
-            if (tile.index === this.turnTile) return tile;
+            if (tile.properties.wall === "true") return null;
+            if (tile.properties.turnPoint === "true") return tile;
         }
         return null; // Not found
     },
@@ -153,7 +145,7 @@ PhaserGame.prototype = {
     },
 
     moveEnemy: function (enemy = this.police) {
-        if (!enemy.ready || this.currentTile(enemy).index !== this.turnTile) return;
+        if (!enemy.ready || this.currentTile(enemy).properties.turnPoint !== "true") return;
         enemy.ready = false;
 
         let stopPoints = this.findStopPoints(enemy);
@@ -207,19 +199,21 @@ PhaserGame.prototype = {
     },
 
     warp: function (keyPressed) {
-        if (this.currentTile().index !== this.turnTile) return;
+        if (this.currentTile().properties.turnPoint !== "true") return;
 
         let direction = keyPressed.direction;
-        if (this.stopPoints[direction] !== null) {
-            let x = this.stopPoints[direction].worldX + this.gridsize / 2;
-            let y = this.stopPoints[direction].worldY + this.gridsize / 2;
+        let stopPoint = this.stopPoints[direction];
 
-            this.add.tween(this.car).to({x: x, y: y}, 300, Phaser.Easing.Circular.InOut, true);
-            if (direction !== this.current)
-                this.add.tween(this.car).to({angle: this.getAngle(direction)}, 150, Phaser.Easing.Circular.InOut, true);
+        if (stopPoint === null) return;
 
-            this.current = direction;
-        }
+        let x = stopPoint.worldX + this.gridsize / 2;
+        let y = stopPoint.worldY + this.gridsize / 2;
+
+        this.add.tween(this.car).to({x: x, y: y}, 300, Phaser.Easing.Circular.InOut, true);
+        if (direction !== this.current)
+            this.add.tween(this.car).to({angle: this.getAngle(direction)}, 150, Phaser.Easing.Circular.InOut, true);
+
+        this.current = direction;
     },
 };
 
