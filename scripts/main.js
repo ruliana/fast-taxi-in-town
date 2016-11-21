@@ -9,7 +9,7 @@ const PhaserGame = function (game) {
     this.map = null;
     this.layer = null;
     this.car = null;
-    this.police = null;
+    this.enemy = null;
 
     this.enemySpeed = 200;
     this.enemyTurnSpeed = 200;
@@ -29,8 +29,8 @@ PhaserGame.prototype = {
     preload: function () {
         this.load.tilemap('map', 'assets/maze.json', null, Phaser.Tilemap.TILED_JSON);
         this.load.image('tiles', 'assets/tiles.png');
-        this.load.image('car', 'assets/taxi.png');
-        this.load.atlasJSONArray('police', 'assets/police.png', 'assets/police.json')
+        this.load.image('enemy', 'assets/taxi.png');
+        this.load.atlasJSONArray('car', 'assets/police.png', 'assets/police.json')
     },
 
     create: function () {
@@ -44,66 +44,57 @@ PhaserGame.prototype = {
         this.car.width = this.gridsize * 0.6;
         this.car.height = this.gridsize * 0.8;
         this.car.angle = 180;
+        this.car.animations.add('siren', [0, 2], 5, true);
+        this.car.animations.play('siren');
+        this.car.ready = true;
+        this.car.destination = null;
 
         this.physics.arcade.enable(this.car);
 
-        this.police = this.add.sprite(
+        this.enemy = this.add.sprite(
             this.gridsize * 10 + this.gridsize / 2,
             this.gridsize + this.gridsize / 2,
-            'police');
-        this.police.anchor.set(0.5);
-        this.police.width = this.gridsize * 0.6;
-        this.police.height = this.gridsize * 0.8;
+            'enemy');
+        this.enemy.anchor.set(0.5);
+        this.enemy.width = this.gridsize * 0.6;
+        this.enemy.height = this.gridsize * 0.8;
 
-        this.police.animations.add('siren', [0, 2], 5, true);
-        this.police.animations.play('siren');
-        this.police.angle = 180;
-        this.police.face = Phaser.DOWN;
-        this.police.ready = true;
-        this.police.destination = null;
+        this.enemy.angle = 180;
+        this.enemy.face = Phaser.DOWN;
+        this.enemy.ready = true;
+        this.enemy.destination = null;
 
-        this.physics.arcade.enable(this.police);
+        this.physics.arcade.enable(this.enemy);
 
         this.cursors = this.input.keyboard.createCursorKeys();
 
-        // Warp
+        // Helpers for easy redirection
         this.cursors.left.direction = Phaser.LEFT;
-        this.cursors.left.angle = -90;
-        this.cursors.left.onDown.add(this.warp, this);
-
         this.cursors.right.direction = Phaser.RIGHT;
-        this.cursors.right.angle = 90;
-        this.cursors.right.onDown.add(this.warp, this);
-
         this.cursors.up.direction = Phaser.UP;
-        this.cursors.up.angle = 0;
-        this.cursors.up.onDown.add(this.warp, this);
-
         this.cursors.down.direction = Phaser.DOWN;
-        this.cursors.down.angle = 180;
-        this.cursors.down.onDown.add(this.warp, this);
     },
 
     update: function () {
         this.physics.arcade.collide(this.car, this.layer);
-        this.physics.arcade.collide(this.police, this.layer);
-        this.physics.arcade.overlap(this.car, this.police, this.gotcha, null, this);
+        this.physics.arcade.collide(this.enemy, this.layer);
+        this.physics.arcade.overlap(this.car, this.enemy, this.gotcha, null, this);
 
         this.stopPoints = this.findStopPoints(this.car);
-
+        this.moveCar();
         this.moveEnemy();
     },
 
     render: function () {
-        let good = 'rgba(0,255,0,0.3)';
-        let bad = 'rgba(255,0,0,0.3)';
-        for (let tile of this.stopPoints.filter(t => t !== null)) {
-            this.game.debug.geom(new Phaser.Rectangle(tile.worldX, tile.worldY, 32, 32), good, true);
-        }
-        if (this.police.destination !== null) {
-            let tile = this.police.destination;
-            this.game.debug.geom(new Phaser.Rectangle(tile.worldX, tile.worldY, 32, 32), bad, true);
-        }
+        // let good = 'rgba(0,255,0,0.3)';
+        // let bad = 'rgba(255,0,0,0.3)';
+        // for (let tile of this.stopPoints.filter(t => t !== null)) {
+        //     this.game.debug.geom(new Phaser.Rectangle(tile.worldX, tile.worldY, 32, 32), good, true);
+        // }
+        // if (this.enemy.destination !== null) {
+        //     let tile = this.enemy.destination;
+        //     this.game.debug.geom(new Phaser.Rectangle(tile.worldX, tile.worldY, 32, 32), bad, true);
+        // }
     },
 
     findStopPoints: function (someObject) {
@@ -141,39 +132,60 @@ PhaserGame.prototype = {
 
     gotcha: function () {
         console.log("TODO: Explode");
-        this.car.kill();
+        this.enemy.kill();
     },
 
-    moveEnemy: function (enemy = this.police) {
+    moveCar: function () {
+        let car = this.car;
+        if (!car.ready || this.currentTile(car).properties.turnPoint !== "true") return;
+
+        let stopPoints = this.findStopPoints(car);
+        let c = this.cursors;
+        let keyPressed = [c.left, c.right, c.up, c.down].find(k => k.isDown);
+        if (keyPressed == null) return;
+
+        let direction = keyPressed.direction;
+        let goTo = stopPoints[direction];
+
+        if (goTo === null) return;
+
+        this.moveObject(car, goTo);
+    },
+
+    moveEnemy: function (enemy = this.enemy) {
         if (!enemy.ready || this.currentTile(enemy).properties.turnPoint !== "true") return;
-        enemy.ready = false;
 
         let stopPoints = this.findStopPoints(enemy);
         let validDestinations = stopPoints.filter(e => e !== null);
         let goTo = validDestinations[this.game.rnd.integerInRange(0, validDestinations.length - 1)];
 
-        enemy.destination = goTo;
+        this.moveObject(enemy, goTo);
+    },
+
+    moveObject: function (someObject, goTo) {
+        someObject.ready = false;
+        someObject.destination = goTo;
 
         let x = goTo.worldX + this.gridsize / 2;
         let y = goTo.worldY + this.gridsize / 2;
 
-        let time = this.math.distance(enemy.x, enemy.y, x, y) / this.gridsize;
+        let time = this.math.distance(someObject.x, someObject.y, x, y) / this.gridsize;
         let duration = time * this.enemySpeed;
-        this.add.tween(enemy).to({x: x, y: y}, duration, Phaser.Easing.Linear.InOut, true)
-            .onComplete.add(() => enemy.ready = true);
+        this.add.tween(someObject).to({x: x, y: y}, duration, Phaser.Easing.Linear.InOut, true)
+            .onComplete.add(() => someObject.ready = true);
 
         // Shortest rotation toward tile
-        let toRotation = this.math.angleBetween(enemy.x, enemy.y, x, y) + Math.PI / 2;
+        let toRotation = this.math.angleBetween(someObject.x, someObject.y, x, y) + Math.PI / 2;
         if (toRotation >= 3 * Math.PI / 2) {
             toRotation = -(Math.PI / 2);
-        } else if (toRotation === Math.PI / 2 && enemy.rotation === -Math.PI) {
+        } else if (toRotation === Math.PI / 2 && someObject.rotation === -Math.PI) {
             toRotation = -(3 * Math.PI / 2);
-        } else if (toRotation === Math.PI && enemy.rotation === -Math.PI) {
-            toRotation = enemy.rotation;
-        } else if (toRotation === Math.PI && enemy.rotation === -(Math.PI / 2)) {
+        } else if (toRotation === Math.PI && someObject.rotation === -Math.PI) {
+            toRotation = someObject.rotation;
+        } else if (toRotation === Math.PI && someObject.rotation === -(Math.PI / 2)) {
             toRotation = -Math.PI;
         }
-        this.add.tween(enemy).to({rotation: toRotation}, this.enemyTurnSpeed, Phaser.Easing.Linear.InOut, true);
+        this.add.tween(someObject).to({rotation: toRotation}, this.enemyTurnSpeed, Phaser.Easing.Linear.InOut, true);
     },
 
     currentTile: function (someObject = this.car) {
@@ -186,34 +198,6 @@ PhaserGame.prototype = {
         let x = this.math.snapToFloor(Math.floor(someObject.x), this.gridsize) / this.gridsize;
         let y = this.math.snapToFloor(Math.floor(someObject.y), this.gridsize) / this.gridsize;
         return [x, y];
-    },
-
-    getAngle: function (to, someObject = this.current) {
-        if (to === Phaser.UP) return 0;
-        if (someObject === Phaser.DOWN && to === Phaser.RIGHT) return -270;
-        if (someObject === Phaser.LEFT && to === Phaser.DOWN) return -180;
-        if (to === Phaser.LEFT) return -90;
-        if (to === Phaser.RIGHT) return 90;
-
-        return 180;
-    },
-
-    warp: function (keyPressed) {
-        if (this.currentTile().properties.turnPoint !== "true") return;
-
-        let direction = keyPressed.direction;
-        let stopPoint = this.stopPoints[direction];
-
-        if (stopPoint === null) return;
-
-        let x = stopPoint.worldX + this.gridsize / 2;
-        let y = stopPoint.worldY + this.gridsize / 2;
-
-        this.add.tween(this.car).to({x: x, y: y}, 300, Phaser.Easing.Circular.InOut, true);
-        if (direction !== this.current)
-            this.add.tween(this.car).to({angle: this.getAngle(direction)}, 150, Phaser.Easing.Circular.InOut, true);
-
-        this.current = direction;
     },
 };
 
