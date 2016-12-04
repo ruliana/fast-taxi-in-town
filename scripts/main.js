@@ -8,8 +8,7 @@ const game = new Phaser.Game(BOARD_WIDTH, BOARD_HEIGHT, Phaser.AUTO, 'game');
 const PhaserGame = function (game) {
     this.map = null;
     this.layer = null;
-    this.car = null;
-    this.enemy = null;
+    this.hero = null;
 
     this.turnSpeed = 200;
 
@@ -25,7 +24,7 @@ PhaserGame.prototype = {
         this.load.tilemap('map', 'assets/forest.json', null, Phaser.Tilemap.TILED_JSON);
         this.load.image('tiles', 'assets/castle-tiles.png');
         this.load.image('enemy', 'assets/taxi.png');
-        this.load.atlasJSONArray('car', 'assets/police.png', 'assets/police.json')
+        this.load.atlasJSONArray('hero', 'assets/police.png', 'assets/police.json')
     },
 
     create: function () {
@@ -38,39 +37,23 @@ PhaserGame.prototype = {
         this.map.createLayer('floor');
         this.map.createLayer('floor-front');
         this.layer = this.map.createLayer('stop-points');
+        this.layer.visible = false;
 
-        this.car = this.add.sprite(this.gridsize * 6 + this.gridsize / 2,
-                                   this.gridsize * 4 + this.gridsize / 2,
-                                   'car');
-        this.car.anchor.set(0.5);
-        this.car.width = this.gridsize * 0.6;
-        this.car.height = this.gridsize * 0.8;
-        this.car.angle = 180;
-        this.car.animations.add('siren', [0, 2], 5, true);
-        this.car.animations.play('siren');
-        this.car.ready = true;
-        this.car.destination = null;
-        this.car.tween = Phaser.Easing.Circular.InOut;
-        this.car.speedBy = time => 200;
+        this.hero = this.add.sprite(this.gridsize * 6 + this.gridsize / 2,
+                                    this.gridsize * 4 + this.gridsize / 2,
+                                    'hero');
+        this.hero.anchor.set(0.5);
+        this.hero.width = this.gridsize * 0.6;
+        this.hero.height = this.gridsize * 0.8;
+        this.hero.angle = 180;
+        this.hero.animations.add('siren', [0, 2], 5, true);
+        this.hero.animations.play('siren');
+        this.hero.ready = true;
+        this.hero.destination = null;
+        this.hero.tween = Phaser.Easing.Circular.Out;
+        this.hero.speedBy = time => 100;
 
-        this.physics.arcade.enable(this.car);
-
-        // this.enemy = this.add.sprite(
-        //     this.gridsize * 10 + this.gridsize / 2,
-        //     this.gridsize + this.gridsize / 2,
-        //     'enemy');
-        // this.enemy.anchor.set(0.5);
-        // this.enemy.width = this.gridsize * 0.6;
-        // this.enemy.height = this.gridsize * 0.8;
-        //
-        // this.enemy.angle = 180;
-        // this.enemy.face = Phaser.DOWN;
-        // this.enemy.ready = true;
-        // this.enemy.destination = null;
-        // this.enemy.tween = Phaser.Easing.Linear.InOut;
-        // this.enemy.speedBy = time => time * 200;
-        //
-        // this.physics.arcade.enable(this.enemy);
+        this.physics.arcade.enable(this.hero);
 
         this.map.createLayer('decoration');
 
@@ -85,12 +68,8 @@ PhaserGame.prototype = {
     },
 
     update: function () {
-        this.physics.arcade.collide(this.car, this.layer);
-        // this.physics.arcade.collide(this.enemy, this.layer);
-        // this.physics.arcade.overlap(this.car, this.enemy, this.gotcha, null, this);
-
-        this.moveCar();
-        // this.moveEnemy();
+        this.physics.arcade.collide(this.hero, this.layer);
+        this.move();
     },
 
     render: function () {
@@ -138,16 +117,11 @@ PhaserGame.prototype = {
         return null; // Not found
     },
 
-    gotcha: function () {
-        console.log("TODO: Explode");
-        this.enemy.kill();
-    },
+    move: function () {
+        let someObject = this.hero;
+        if (!someObject.ready || this.currentTile(someObject).properties.turnPoint !== "true") return;
 
-    moveCar: function () {
-        let car = this.car;
-        if (!car.ready || this.currentTile(car).properties.turnPoint !== "true") return;
-
-        let stopPoints = this.findStopPoints(car);
+        let stopPoints = this.findStopPoints(someObject);
         let c = this.cursors;
         let keyPressed = [c.left, c.right, c.up, c.down].find(k => k.isDown);
         if (keyPressed == null) return;
@@ -157,17 +131,7 @@ PhaserGame.prototype = {
 
         if (goTo === null) return;
 
-        this.moveObject(car, goTo);
-    },
-
-    moveEnemy: function (enemy = this.enemy) {
-        if (!enemy.ready || this.currentTile(enemy).properties.turnPoint !== "true") return;
-
-        let stopPoints = this.findStopPoints(enemy);
-        let validDestinations = stopPoints.filter(e => e !== null);
-        let goTo = validDestinations[this.game.rnd.integerInRange(0, validDestinations.length - 1)];
-
-        this.moveObject(enemy, goTo);
+        this.moveObject(someObject, goTo);
     },
 
     moveObject: function (someObject, goTo) {
@@ -180,7 +144,6 @@ PhaserGame.prototype = {
         let time = this.math.distance(someObject.x, someObject.y, x, y) / this.gridsize;
         let duration = someObject.speedBy(time);
         let tween = someObject.tween;
-        //let duration = time * this.enemySpeed;
         this.add.tween(someObject).to({x: x, y: y}, duration, tween, true)
             .onComplete.add(() => someObject.ready = true);
 
@@ -198,7 +161,7 @@ PhaserGame.prototype = {
         this.add.tween(someObject).to({rotation: toRotation}, this.turnSpeed, Phaser.Easing.Linear.InOut, true);
     },
 
-    currentTile: function (someObject = this.car) {
+    currentTile: function (someObject = this.hero) {
         let [x, y] = this.xyTileFor(someObject);
         let i = this.layer.index;
         return this.map.getTile(x, y, i);
