@@ -11,12 +11,7 @@ const PhaserGame = function (game) {
     this.car = null;
     this.enemy = null;
 
-    this.enemySpeed = 200;
-    this.enemyTurnSpeed = 200;
-
-    this.current = Phaser.DOWN;
-
-    this.stopPoints = [];
+    this.turnSpeed = 200;
 
     this.gridsize = 32;
 };
@@ -27,19 +22,26 @@ PhaserGame.prototype = {
     },
 
     preload: function () {
-        this.load.tilemap('map', 'assets/maze.json', null, Phaser.Tilemap.TILED_JSON);
-        this.load.image('tiles', 'assets/tiles.png');
+        this.load.tilemap('map', 'assets/forest.json', null, Phaser.Tilemap.TILED_JSON);
+        this.load.image('tiles', 'assets/castle-tiles.png');
         this.load.image('enemy', 'assets/taxi.png');
         this.load.atlasJSONArray('car', 'assets/police.png', 'assets/police.json')
     },
 
     create: function () {
         this.map = this.add.tilemap('map');
-        this.map.addTilesetImage('tiles', 'tiles');
+        this.map.addTilesetImage('castle', 'tiles');
 
-        this.layer = this.map.createLayer('Tile Layer 2');
+        this.stage.backgroundColor = "#4488AA";
+        this.map.createLayer('bkg');
+        this.map.createLayer('bkg-decoration');
+        this.map.createLayer('floor');
+        this.map.createLayer('floor-front');
+        this.layer = this.map.createLayer('stop-points');
 
-        this.car = this.add.sprite(48, 48, 'car');
+        this.car = this.add.sprite(this.gridsize * 6 + this.gridsize / 2,
+                                   this.gridsize * 4 + this.gridsize / 2,
+                                   'car');
         this.car.anchor.set(0.5);
         this.car.width = this.gridsize * 0.6;
         this.car.height = this.gridsize * 0.8;
@@ -48,23 +50,30 @@ PhaserGame.prototype = {
         this.car.animations.play('siren');
         this.car.ready = true;
         this.car.destination = null;
+        this.car.tween = Phaser.Easing.Circular.InOut;
+        this.car.speedBy = time => 200;
 
         this.physics.arcade.enable(this.car);
 
-        this.enemy = this.add.sprite(
-            this.gridsize * 10 + this.gridsize / 2,
-            this.gridsize + this.gridsize / 2,
-            'enemy');
-        this.enemy.anchor.set(0.5);
-        this.enemy.width = this.gridsize * 0.6;
-        this.enemy.height = this.gridsize * 0.8;
+        // this.enemy = this.add.sprite(
+        //     this.gridsize * 10 + this.gridsize / 2,
+        //     this.gridsize + this.gridsize / 2,
+        //     'enemy');
+        // this.enemy.anchor.set(0.5);
+        // this.enemy.width = this.gridsize * 0.6;
+        // this.enemy.height = this.gridsize * 0.8;
+        //
+        // this.enemy.angle = 180;
+        // this.enemy.face = Phaser.DOWN;
+        // this.enemy.ready = true;
+        // this.enemy.destination = null;
+        // this.enemy.tween = Phaser.Easing.Linear.InOut;
+        // this.enemy.speedBy = time => time * 200;
+        //
+        // this.physics.arcade.enable(this.enemy);
 
-        this.enemy.angle = 180;
-        this.enemy.face = Phaser.DOWN;
-        this.enemy.ready = true;
-        this.enemy.destination = null;
+        this.map.createLayer('decoration');
 
-        this.physics.arcade.enable(this.enemy);
 
         this.cursors = this.input.keyboard.createCursorKeys();
 
@@ -77,12 +86,11 @@ PhaserGame.prototype = {
 
     update: function () {
         this.physics.arcade.collide(this.car, this.layer);
-        this.physics.arcade.collide(this.enemy, this.layer);
-        this.physics.arcade.overlap(this.car, this.enemy, this.gotcha, null, this);
+        // this.physics.arcade.collide(this.enemy, this.layer);
+        // this.physics.arcade.overlap(this.car, this.enemy, this.gotcha, null, this);
 
-        this.stopPoints = this.findStopPoints(this.car);
         this.moveCar();
-        this.moveEnemy();
+        // this.moveEnemy();
     },
 
     render: function () {
@@ -170,8 +178,10 @@ PhaserGame.prototype = {
         let y = goTo.worldY + this.gridsize / 2;
 
         let time = this.math.distance(someObject.x, someObject.y, x, y) / this.gridsize;
-        let duration = time * this.enemySpeed;
-        this.add.tween(someObject).to({x: x, y: y}, duration, Phaser.Easing.Linear.InOut, true)
+        let duration = someObject.speedBy(time);
+        let tween = someObject.tween;
+        //let duration = time * this.enemySpeed;
+        this.add.tween(someObject).to({x: x, y: y}, duration, tween, true)
             .onComplete.add(() => someObject.ready = true);
 
         // Shortest rotation toward tile
@@ -185,7 +195,7 @@ PhaserGame.prototype = {
         } else if (toRotation === Math.PI && someObject.rotation === -(Math.PI / 2)) {
             toRotation = -Math.PI;
         }
-        this.add.tween(someObject).to({rotation: toRotation}, this.enemyTurnSpeed, Phaser.Easing.Linear.InOut, true);
+        this.add.tween(someObject).to({rotation: toRotation}, this.turnSpeed, Phaser.Easing.Linear.InOut, true);
     },
 
     currentTile: function (someObject = this.car) {
