@@ -3,6 +3,126 @@ Array.prototype.last = function () {
     return this[this.length - 1];
 };
 
+class TaskDoing {
+    constructor() {
+        this.timeInMillis = Date.now();
+        this.steps = [];
+        this.moves = 0;
+    }
+
+    lastStep() {
+        return this.steps.last();
+    }
+
+    push(step) {
+        this.steps.push(step);
+    }
+
+    pop(step) {
+        return this.steps.pop(step);
+    }
+
+    matchesSteps(steps) {
+        if (this.steps.length != steps.length) return false;
+        for (let i = 0; i < steps.length; i++) {
+            if (this.steps[i] !== steps[i]) return false;
+        }
+        return true;
+    }
+
+    movePlus(number) {
+        this.moves += number;
+    }
+
+    moveCount() {
+        return this.moves;
+    }
+
+    toString() {
+        return this.steps.join(", ");
+    }
+}
+
+class Task {
+    constructor(time, steps) {
+        this.time = time;
+        this.steps = steps;
+    }
+
+    toString() {
+        return this.steps.join(", ");
+    }
+
+    matches(doing) {
+        return doing.matchesSteps(this.steps);
+    }
+}
+
+class TaskAnnotated {
+    constructor(todo, done) {
+        this.finishInMillis = Date.now();
+        this.todo = todo;
+        this.done = done;
+    }
+
+    correct() {
+        return this.todo.matches(this.done);
+    }
+
+    difficulty() {
+        return 1.0;
+    }
+}
+
+class TaskLibrary {
+    constructor() {
+        this.tasks = [];
+    }
+
+    push(taskAnnotated) {
+        this.tasks.push(taskAnnotated);
+    }
+
+    newTask() {
+        let size = game.rnd.between(1, 6);
+        let rslt = [];
+        for (let i = 1; i <= size; i++) {
+            let e = game.rnd.between(1, 3);
+            if (rslt.length == 1 || rslt.last() !== e)
+                rslt.push(e);
+        }
+        return new Task(1, rslt);
+    }
+
+    correctCount() {
+        return this.tasks.filter(e => e.correct()).length;
+    }
+
+    incorrectCount() {
+        return this.tasks.length - this.correctCount();
+    }
+}
+
+class TaskBoard {
+    constructor(tasks = []) {
+        this.tasks= tasks;
+    }
+
+    push(task) {
+        this.tasks.push(task);
+    }
+
+    complete(task) {
+        let first = this.tasks.shift();
+        return new TaskAnnotated(first, task);
+    }
+
+    toString() {
+        return this.tasks.map(e => e.toString()).join('\n');
+    }
+ }
+
+
 const BOARD_WIDTH = 640;
 const BOARD_HEIGHT = 480;
 
@@ -17,12 +137,12 @@ const PhaserGame = function (game) {
 
     this.gridsize = 32;
 
-    this.tasks = [[1, 1, 2, 3], [2, 2, 3, 2]];
+    this.taskBoard = new TaskBoard();
+    this.taskBoard.push(new Task(1, [1, 2, 3]));
+    this.taskBoard.push(new Task(1, [2, 3, 2]));
 
-    this.taskDoing = [];
-    this.taskDoingMovements = 0;
-    this.taskDoingMisses = 0;
-    this.taskDoingWrongComplete = 0;
+    this.taskDoing = new TaskDoing();
+    this.taskLibrary = new TaskLibrary();
 };
 
 PhaserGame.prototype = {
@@ -69,7 +189,7 @@ PhaserGame.prototype = {
         this.map.createLayer('decoration');
 
         // Tasks
-        let taskTexts = this.tasks.map(e => e.slice(1).join(', ')).join('\n');
+        let taskTexts = this.taskBoard.toString();
         this.taskText = this.add.text(16, 16, "Tasks:\n" + taskTexts, {fontSize: '24px', fill: '#FFF'});
         this.debugText = this.add.text(160, 335, "Debug:", {fontSize: '16px', fill: '#FFF'});
 
@@ -137,46 +257,24 @@ PhaserGame.prototype = {
         if (tile == null) return;
         if (tile.properties.task == null) return;
 
-        let taskNumber = tile.properties.task;
-        let taskLast = this.taskDoing.last();
+        let taskMove = parseInt(tile.properties.task);
+        let taskLastMove = this.taskDoing.lastStep();
 
-        if (taskLast === taskNumber) {
-            this.taskDoingMisses += 1;
+        if (taskLastMove === taskMove) {
             this.taskDoing.pop();
         } else {
-            this.taskDoing.push(taskNumber);
+            this.taskDoing.push(taskMove);
         }
     },
 
     taskComplete: function () {
-        let doing = this.taskDoing.join("");
-        let goal = this.tasks[0].slice(1).join("");
-        if (doing !== goal) {
-            this.taskDoingWrongComplete += 1;
-            return;
-        }
+        let done = this.taskBoard.complete(this.taskDoing);
 
-        this.taskDoing = [];
-        this.taskDoingMovements = 0;
-        this.taskDoingMisses = 0;
-        this.taskDoingWrongComplete = 0;
+        this.taskLibrary.push(done);
+        this.taskBoard.push(this.taskLibrary.newTask());
+        this.taskDoing = new TaskDoing();
 
-        this.tasks.shift();
-        this.tasks.push(this.newTask());
-
-        let taskTexts = this.tasks.map(e => e.slice(1).join(', ')).join('\n');
-        this.taskText.text = "Tasks:\n" + taskTexts;
-    },
-
-    newTask: function () {
-        let size = this.rnd.integerInRange(1, 6);
-        let rslt = [1]; // time
-        for (let i = 1; i <= size; i++) {
-            let e = this.rnd.integerInRange(1, 3);
-            if (rslt.length == 1 || rslt.last() !== e)
-                rslt.push(e);
-        }
-        return rslt;
+        this.taskText.text = "Tasks:\n" + this.taskBoard.toString();
     },
 
     move: function () {
@@ -196,17 +294,16 @@ PhaserGame.prototype = {
 
         this.moveObject(someObject, goTo);
 
-        this.taskDoingMovements += 1;
+        this.taskDoing.movePlus(1);
         if (goTo.properties.complete === "true") {
             this.taskComplete();
         } else {
             this.pickup(goTo);
         }
         this.debugText.text = "Debug:\n"
-            + "Doing: " + this.taskDoing.join(", ") + "\n"
-            + "Moves: " + this.taskDoingMovements + "\n"
-            + "Misses: " + this.taskDoingMisses + "\n"
-            + "Botcha: " + this.taskDoingWrongComplete + "\n";
+            + "Doing: " + this.taskDoing.toString() + "\n"
+            + "Moves: " + this.taskDoing.moveCount() + "\n"
+            + "C/I: " + this.taskLibrary.correctCount() + "/" + this.taskLibrary.incorrectCount() + "\n";
     },
 
     moveObject: function (someObject, goTo) {
