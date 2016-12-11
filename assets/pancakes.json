@@ -1,0 +1,44 @@
+{"frames": [
+
+{
+	"filename": "pancake-blue.png",
+	"frame": {"x":1,"y":1,"w":22,"h":13},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":5,"y":10,"w":22,"h":13},
+	"sourceSize": {"w":32,"h":32}
+},
+{
+	"filename": "pancake-empty.png",
+	"frame": {"x":1,"y":46,"w":22,"h":12},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":5,"y":11,"w":22,"h":12},
+	"sourceSize": {"w":32,"h":32}
+},
+{
+	"filename": "pancake-orange.png",
+	"frame": {"x":1,"y":16,"w":22,"h":13},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":5,"y":10,"w":22,"h":13},
+	"sourceSize": {"w":32,"h":32}
+},
+{
+	"filename": "pancake-red.png",
+	"frame": {"x":1,"y":31,"w":22,"h":13},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":5,"y":10,"w":22,"h":13},
+	"sourceSize": {"w":32,"h":32}
+}],
+"meta": {
+	"app": "http://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "pancakes.png",
+	"format": "RGBA8888",
+	"size": {"w":24,"h":59},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:b7b56b7e88f49200b02b1c9005ecb8d5:e498af531a113982e8ec93557d56d897:b5bf5d6ddd9ecbedec7a96e6ba2152c4$"
+}
+}

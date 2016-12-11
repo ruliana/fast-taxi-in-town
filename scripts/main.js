@@ -8,6 +8,14 @@ class TaskDoing {
         this.timeInMillis = Date.now();
         this.steps = [];
         this.moves = 0;
+        this.actions = [];
+
+        let action = game => {
+            while (game.hero.children.length > 0) {
+                game.hero.removeChildAt(game.hero.children.length - 1);
+            }
+        };
+        this.actions.push(action);
     }
 
     lastStep() {
@@ -16,10 +24,25 @@ class TaskDoing {
 
     push(step) {
         this.steps.push(step);
+
+        let action = game => {
+            let y = -8 + (-6 * this.steps.length);
+            let pancake = game.add.sprite(-16, y, 'pancakes');
+            pancake.frame = step - 1;
+            game.hero.addChild(pancake);
+        };
+        this.actions.push(action);
     }
 
     pop(step) {
-        return this.steps.pop(step);
+        let rslt = this.steps.pop(step);
+
+        let action = game => {
+            game.hero.removeChildAt(game.hero.children.length - 1);
+        };
+        this.actions.push(action);
+
+        return rslt;
     }
 
     matchesSteps(steps) {
@@ -41,6 +64,13 @@ class TaskDoing {
     toString() {
         return this.steps.join(", ");
     }
+
+    update(game) {
+        while (this.actions.length > 0) {
+            let action = this.actions.shift();
+            action(game);
+        }
+    }
 }
 
 class Task {
@@ -55,6 +85,17 @@ class Task {
 
     matches(doing) {
         return doing.matchesSteps(this.steps);
+    }
+
+    createSprite(game) {
+        let rslt = game.add.sprite(0, 0, 'pancakes');
+        rslt.frame = this.steps[0] - 1;
+        for (let i = 1; i < this.steps.length; i++) {
+            let child = game.add.sprite(0, -6 * i, 'pancakes');
+            child.frame = this.steps[i] - 1;
+            rslt.addChild(child);
+        }
+        return rslt;
     }
 }
 
@@ -88,7 +129,7 @@ class TaskLibrary {
         let rslt = [];
         for (let i = 1; i <= size; i++) {
             let e = game.rnd.between(1, 3);
-            if (rslt.length == 1 || rslt.last() !== e)
+            if (rslt.length == 0 || rslt.last() !== e)
                 rslt.push(e);
         }
         return new Task(1, rslt);
@@ -106,19 +147,50 @@ class TaskLibrary {
 class TaskBoard {
     constructor(tasks = []) {
         this.tasks= tasks;
+        this.sprites = [];
+        this.actions = [];
     }
 
     push(task) {
         this.tasks.push(task);
+
+        let len = this.tasks.length;
+        let action = game => {
+            let sprite = task.createSprite(game);
+            sprite.x = 32 * len;
+            sprite.y = 80;
+            this.sprites.push(sprite);
+        };
+        this.actions.push(action);
     }
 
     complete(task) {
         let first = this.tasks.shift();
-        return new TaskAnnotated(first, task);
+        let rslt = new TaskAnnotated(first, task);
+
+        let action = game => {
+            let tweens = this.sprites
+                .map(sp => game.add.tween(sp).to({x: sp.x - 32},
+                                                 200,
+                                                 Phaser.Easing.Circular.InOut,
+                                                 true));
+            let done = this.sprites.shift();
+            tweens[0].onComplete.add(() => done.kill());
+        };
+        this.actions.push(action);
+
+        return rslt;
     }
 
     toString() {
         return this.tasks.map(e => e.toString()).join('\n');
+    }
+
+    update(game) {
+        while (this.actions.length > 0) {
+            let action = this.actions.shift();
+            action(game);
+        }
     }
  }
 
@@ -138,9 +210,6 @@ const PhaserGame = function (game) {
     this.gridsize = 32;
 
     this.taskBoard = new TaskBoard();
-    this.taskBoard.push(new Task(1, [1, 2, 3]));
-    this.taskBoard.push(new Task(1, [2, 3, 2]));
-
     this.taskDoing = new TaskDoing();
     this.taskLibrary = new TaskLibrary();
 };
@@ -153,14 +222,14 @@ PhaserGame.prototype = {
     preload: function () {
         this.load.tilemap('map', 'assets/forest.json', null, Phaser.Tilemap.TILED_JSON);
         this.load.image('castle', 'assets/castle-tiles.png');
-        this.load.image('potions', 'assets/potions.png');
-        this.load.atlasJSONArray('hero', 'assets/police.png', 'assets/police.json')
+        this.load.spritesheet('pancakes', 'assets/pancakes.png', 32, 32);
+        this.load.image('hero', 'assets/ninja-idle.png');
     },
 
     create: function () {
         this.map = this.add.tilemap('map');
-        this.map.addTilesetImage('castle', 'castle');
-        this.map.addTilesetImage('potions', 'potions');
+        this.map.addTilesetImage('castle');
+        this.map.addTilesetImage('pancakes');
 
         this.stage.backgroundColor = "#4488AA";
         this.map.createLayer('bkg');
@@ -174,11 +243,6 @@ PhaserGame.prototype = {
                                     this.gridsize * 4 + this.gridsize / 2,
                                     'hero');
         this.hero.anchor.set(0.5);
-        this.hero.width = this.gridsize * 0.6;
-        this.hero.height = this.gridsize * 0.8;
-        this.hero.angle = 180;
-        this.hero.animations.add('siren', [0, 2], 5, true);
-        this.hero.animations.play('siren');
         this.hero.ready = true;
         this.hero.destination = null;
         this.hero.tween = Phaser.Easing.Circular.Out;
@@ -187,10 +251,10 @@ PhaserGame.prototype = {
         this.physics.arcade.enable(this.hero);
 
         this.map.createLayer('decoration');
+        this.map.createLayer('pancakes');
 
         // Tasks
-        let taskTexts = this.taskBoard.toString();
-        this.taskText = this.add.text(16, 16, "Tasks:\n" + taskTexts, {fontSize: '24px', fill: '#FFF'});
+        this.taskText = this.add.text(24, 48, "Orders:", {fontSize: '24px', fill: '#FFF'});
         this.debugText = this.add.text(160, 335, "Debug:", {fontSize: '16px', fill: '#FFF'});
 
         // Input
@@ -201,6 +265,11 @@ PhaserGame.prototype = {
         this.cursors.right.direction = Phaser.RIGHT;
         this.cursors.up.direction = Phaser.UP;
         this.cursors.down.direction = Phaser.DOWN;
+
+        // Starting
+        this.taskBoard.push(new Task(1, [1, 2, 3]));
+        this.taskBoard.push(new Task(1, [2, 3, 2]));
+        this.taskBoard.update(this);
     },
 
     update: function () {
@@ -273,8 +342,6 @@ PhaserGame.prototype = {
         this.taskLibrary.push(done);
         this.taskBoard.push(this.taskLibrary.newTask());
         this.taskDoing = new TaskDoing();
-
-        this.taskText.text = "Tasks:\n" + this.taskBoard.toString();
     },
 
     move: function () {
@@ -317,20 +384,9 @@ PhaserGame.prototype = {
         let duration = someObject.speedBy(time);
         let tween = someObject.tween;
         this.add.tween(someObject).to({x: x, y: y}, duration, tween, true)
-            .onComplete.add(() => someObject.ready = true);
-
-        // Shortest rotation toward tile
-        let toRotation = this.math.angleBetween(someObject.x, someObject.y, x, y) + Math.PI / 2;
-        if (toRotation >= 3 * Math.PI / 2) {
-            toRotation = -(Math.PI / 2);
-        } else if (toRotation === Math.PI / 2 && someObject.rotation === -Math.PI) {
-            toRotation = -(3 * Math.PI / 2);
-        } else if (toRotation === Math.PI && someObject.rotation === -Math.PI) {
-            toRotation = someObject.rotation;
-        } else if (toRotation === Math.PI && someObject.rotation === -(Math.PI / 2)) {
-            toRotation = -Math.PI;
-        }
-        this.add.tween(someObject).to({rotation: toRotation}, this.turnSpeed, Phaser.Easing.Linear.InOut, true);
+            .onComplete.add(() => { someObject.ready = true;
+                                    this.taskDoing.update(this);
+                                    this.taskBoard.update(this); });
     },
 
     currentTile: function (someObject = this.hero) {
