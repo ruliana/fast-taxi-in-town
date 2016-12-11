@@ -1,13 +1,74 @@
 "use strict";
+
+// Exclusive max
+function randomInteger(min, max) {
+    return Math.floor(Math.random() * (max - min) + min);
+}
+
 Array.prototype.last = function () {
     return this[this.length - 1];
 };
 
+Array.prototype.first = function () {
+    return this[0];
+};
+
+Array.prototype.randomIndex = function () {
+    return randomInteger(0, this.length);
+};
+
+Array.prototype.randomCutPoint = function () {
+    return new CutPoint(this);
+};
+
+Array.prototype.sample = function () {
+    return this[this.randomIndex()];
+};
+
+Array.prototype.sampleGauss = function () {
+    const a = this.length; // vertical
+    const b = 0;  // middle
+    const c = 0.25; // width
+    const x = Math.random();
+
+    let i = Math.floor(a * Math.exp(-(Math.pow(x - b, 2) / (2 * Math.pow(c, 2)))));
+    return this[i];
+};
+
+class CutPoint {
+    constructor(anArray, cutPoint = anArray.randomIndex()) {
+        this.anArray = anArray;
+        this.cutPoint = cutPoint;
+    }
+
+    slice() {
+        let left = this.anArray.slice(0, this.cutPoint);
+        let right = this.anArray.slice(this.cutPoint);
+        return [left, right];
+    }
+
+    insert(value) {
+        let [left, right] = this.slice();
+        return left.concat([value]).concat(right);
+    }
+
+    remove() {
+        let [left, right] = this.slice();
+        return left.concat(right.slice(1));
+    }
+
+    replace(value) {
+        let [left, right] = this.slice();
+        return left.concat([value]).concat(right.slice(1));
+    }
+}
+
 class TaskDoing {
     constructor() {
-        this.timeInMillis = Date.now();
+        this.startInMillis = Date.now();
         this.steps = [];
         this.moves = 0;
+        this.misses = 0;
         this.actions = [];
 
         let action = game => {
@@ -35,6 +96,7 @@ class TaskDoing {
     }
 
     pop(step) {
+        this.misses += 1;
         let rslt = this.steps.pop(step);
 
         let action = game => {
@@ -59,6 +121,10 @@ class TaskDoing {
 
     moveCount() {
         return this.moves;
+    }
+
+    missesCount() {
+        return this.misses;
     }
 
     toString() {
@@ -97,6 +163,54 @@ class Task {
         }
         return rslt;
     }
+
+    breedWith(otherTask) {
+        return otherTask.randomMix(this.steps);
+    }
+
+    randomMix(steps) {
+        let cutPoint = Math.random();
+
+        let cutPointThis = Math.floor(this.steps.length * cutPoint);
+        let stepsThis = this.steps.slice(0, cutPointThis);
+
+        let cutPointThat = Math.floor(steps.length * cutPoint);
+        let stepsThat = steps.slice(cutPointThat);
+
+        let rsltSteps = stepsThis.concat(stepsThat);
+        return new Task(this.time, rsltSteps).repair();
+    }
+
+    mutate() {
+        if (Math.random() >= 0.1) return this; // Chance of mutation
+        let add = steps => steps.randomCutPoint().insert([1, 2, 3].sample());
+        let remove = steps => steps.randomCutPoint().remove();
+        let replace = steps  => steps.randomCutPoint().replace([1, 2, 3].sample());
+        let action = [add, remove, replace].sample();
+        let rsltSteps = action(this.steps);
+        return new Task(this.time, rsltSteps).repair();
+    }
+
+    repair() {
+        if (this.steps.length <= 1) return this;
+
+        let rslt = this.steps.slice();
+
+        if (this.steps.length == 2) {
+           rslt[1] = [1, 2, 3].filter(e => e !== this.steps.first()).sample();
+        } else {
+            for (let i = 1; i < this.steps.length - 1; i++) {
+                let a = rslt[i - 1];
+                let b = rslt[i];
+                let c = rslt[i + 1];
+                if (a === b || b === c) {
+                    rslt[i] = [1, 2, 3].filter(e => e !== a && e !== c).sample();
+                }
+            }
+        }
+
+        return new Task(this.time, rslt);
+    }
 }
 
 class TaskAnnotated {
@@ -106,12 +220,24 @@ class TaskAnnotated {
         this.done = done;
     }
 
+    get startInMillis() {
+        return this.done.startInMillis;
+    }
+
     correct() {
         return this.todo.matches(this.done);
     }
 
+    incorrect() {
+        return !this.correct();
+    }
+
     difficulty() {
-        return 1.0;
+        return this.finishInMillis - this.startInMillis;
+    }
+
+    breedWith(other) {
+        return this.todo.breedWith(other.todo);
     }
 }
 
@@ -122,9 +248,22 @@ class TaskLibrary {
 
     push(taskAnnotated) {
         this.tasks.push(taskAnnotated);
+        // Best fit
+        this.tasks.sort((a, b) => {
+            if (a.correct() && b.incorrect()) return -1;
+            if (b.correct() && a.incorrect()) return 1;
+            return a.difficulty() - b.difficulty();
+        });
+        this.tasks = this.tasks.slice(0, 10);
     }
 
     newTask() {
+        if (this.tasks.length <= 2) return this.randomTask();
+        let [a, b] = this.selectBest();
+        return a.breedWith(b).mutate();
+    }
+
+    randomTask() {
         let size = game.rnd.between(1, 6);
         let rslt = [];
         for (let i = 1; i <= size; i++) {
@@ -141,6 +280,11 @@ class TaskLibrary {
 
     incorrectCount() {
         return this.tasks.length - this.correctCount();
+    }
+
+    selectBest() {
+        return [this.tasks.sampleGauss(),
+                this.tasks.sampleGauss()];
     }
 }
 
@@ -370,7 +514,8 @@ PhaserGame.prototype = {
         this.debugText.text = "Debug:\n"
             + "Doing: " + this.taskDoing.toString() + "\n"
             + "Moves: " + this.taskDoing.moveCount() + "\n"
-            + "C/I: " + this.taskLibrary.correctCount() + "/" + this.taskLibrary.incorrectCount() + "\n";
+            + "Misses: " + this.taskDoing.missesCount() + "\n"
+            + "Right/Wrong: " + this.taskLibrary.correctCount() + "/" + this.taskLibrary.incorrectCount() + "\n";
     },
 
     moveObject: function (someObject, goTo) {
