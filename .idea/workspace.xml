@@ -1,15 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="BookmarkManager">
-    <bookmark url="file://$PROJECT_DIR$/scripts/main.js" line="473" mnemonic="A" />
-    <bookmark url="file://$PROJECT_DIR$/scripts/main.js" line="82" mnemonic="B" />
+    <bookmark url="file://$PROJECT_DIR$/scripts/main.js" line="510" mnemonic="A" />
+    <bookmark url="file://$PROJECT_DIR$/scripts/main.js" line="94" mnemonic="B" />
   </component>
   <component name="ChangeListManager">
     <list default="true" id="1381ab0e-5835-410a-bba6-07f5aa3665bc" name="Default" comment="">
-      <change type="DELETED" beforePath="$PROJECT_DIR$/assets/.Rhistory" afterPath="" />
-      <change type="DELETED" beforePath="$PROJECT_DIR$/assets/potions.png" afterPath="" />
-      <change type="DELETED" beforePath="$PROJECT_DIR$/vehicle_sprites.zip" afterPath="" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/scripts/main.js" afterPath="$PROJECT_DIR$/scripts/main.js" />
     </list>
     <ignored path="pacman.iws" />
@@ -36,8 +32,8 @@
       <file leaf-file-name="main.js" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/scripts/main.js">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-28">
-              <caret line="239" column="0" lean-forward="false" selection-start-line="239" selection-start-column="0" selection-end-line="239" selection-end-column="0" />
+            <state relative-caret-position="584">
+              <caret line="314" column="68" lean-forward="false" selection-start-line="314" selection-start-column="68" selection-end-line="314" selection-end-column="68" />
               <folding />
             </state>
           </provider>
@@ -271,12 +267,12 @@
       <workItem from="1480972757786" duration="1007000" />
       <workItem from="1481145607106" duration="4214000" />
       <workItem from="1481230527408" duration="10075000" />
-      <workItem from="1481373797428" duration="23125000" />
+      <workItem from="1481373797428" duration="33795000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="108445000" />
+    <option name="totallyTimeSpent" value="119115000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
@@ -510,8 +506,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/scripts/main.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-28">
-          <caret line="239" column="0" lean-forward="false" selection-start-line="239" selection-start-column="0" selection-end-line="239" selection-end-column="0" />
+        <state relative-caret-position="584">
+          <caret line="314" column="68" lean-forward="false" selection-start-line="314" selection-start-column="68" selection-end-line="314" selection-end-column="68" />
           <folding />
         </state>
       </provider>

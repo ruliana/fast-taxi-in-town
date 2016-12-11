@@ -21,19 +21,32 @@ Array.prototype.randomCutPoint = function () {
     return new CutPoint(this);
 };
 
+Array.prototype.sum = function () {
+    return this.reduce((a, e) => a + e, 0);
+};
+
 Array.prototype.sample = function () {
     return this[this.randomIndex()];
 };
 
 Array.prototype.sampleGauss = function () {
-    const a = this.length; // vertical
+    const a = this.length - 1; // vertical
+    const b = 0;  // middle
+    const c = 0.3; // width
+    const x = Math.random();
+
+    let i = Math.round(a * Math.exp(-(Math.pow(x - b, 2) / (2 * Math.pow(c, 2)))));
+    return this[i];
+};
+
+function gauss() {
+    const a = 10; // vertical
     const b = 0;  // middle
     const c = 0.25; // width
     const x = Math.random();
 
-    let i = Math.floor(a * Math.exp(-(Math.pow(x - b, 2) / (2 * Math.pow(c, 2)))));
-    return this[i];
-};
+    return Math.floor(a * Math.exp(-(Math.pow(x - b, 2) / (2 * Math.pow(c, 2)))));
+}
 
 class CutPoint {
     constructor(anArray, cutPoint = anArray.randomIndex()) {
@@ -65,7 +78,6 @@ class CutPoint {
 
 class TaskDoing {
     constructor() {
-        this.startInMillis = Date.now();
         this.steps = [];
         this.moves = 0;
         this.misses = 0;
@@ -95,9 +107,9 @@ class TaskDoing {
         this.actions.push(action);
     }
 
-    pop(step) {
+    pop() {
         this.misses += 1;
-        let rslt = this.steps.pop(step);
+        let rslt = this.steps.pop();
 
         let action = game => {
             game.hero.removeChildAt(game.hero.children.length - 1);
@@ -145,6 +157,14 @@ class Task {
         this.steps = steps;
     }
 
+    get key() {
+        return this.steps.join("");
+    }
+
+    get size() {
+        return this.steps.length;
+    }
+
     toString() {
         return this.steps.join(", ");
     }
@@ -181,8 +201,9 @@ class Task {
         return new Task(this.time, rsltSteps).repair();
     }
 
-    mutate() {
-        if (Math.random() >= 0.1) return this; // Chance of mutation
+    // Mutation chance between 0.0 and 1.0
+    mutate(chance) {
+        if (Math.random() >= chance) return this;
         let add = steps => steps.randomCutPoint().insert([1, 2, 3].sample());
         let remove = steps => steps.randomCutPoint().remove();
         let replace = steps  => steps.randomCutPoint().replace([1, 2, 3].sample());
@@ -214,53 +235,55 @@ class Task {
 }
 
 class TaskAnnotated {
-    constructor(todo, done) {
-        this.finishInMillis = Date.now();
-        this.todo = todo;
-        this.done = done;
+    constructor(task) {
+        this.task = task;
+        this.correct = 0;
+        this.incorrect = 0;
+        this.moves = 0;
     }
 
-    get startInMillis() {
-        return this.done.startInMillis;
+    get key() {
+        return this.task.key;
     }
 
-    correct() {
-        return this.todo.matches(this.done);
-    }
-
-    incorrect() {
-        return !this.correct();
-    }
-
-    difficulty() {
-        return this.finishInMillis - this.startInMillis;
+    get size() {
+        return this.task.size;
     }
 
     breedWith(other) {
-        return this.todo.breedWith(other.todo);
+        return this.task.breedWith(other.task);
     }
 }
 
 class TaskLibrary {
     constructor() {
-        this.tasks = [];
+        this.tasks = new Map();
     }
 
-    push(taskAnnotated) {
-        this.tasks.push(taskAnnotated);
-        // Best fit
-        this.tasks.sort((a, b) => {
-            if (a.correct() && b.incorrect()) return -1;
-            if (b.correct() && a.incorrect()) return 1;
-            return a.difficulty() - b.difficulty();
-        });
-        this.tasks = this.tasks.slice(0, 10);
+    push(done, doing) {
+        let t = this.get(done);
+
+        if (done.matches(doing)) {
+            t.correct += 1;
+            t.moves += doing.moveCount();
+        } else {
+            t.incorrect += 1;
+        }
+    }
+
+    get(task) {
+        let t = this.tasks.get(task.key);
+        if (t == null) {
+            t = new TaskAnnotated(task);
+            this.tasks.set(t.key, t);
+        }
+        return t;
     }
 
     newTask() {
         if (this.tasks.length <= 2) return this.randomTask();
         let [a, b] = this.selectBest();
-        return a.breedWith(b).mutate();
+        return a.breedWith(b).mutate(0.2);
     }
 
     randomTask() {
@@ -274,17 +297,34 @@ class TaskLibrary {
         return new Task(1, rslt);
     }
 
+    selectBest() {
+        let ts = Array.from(this.tasks.values());
+
+        // Sort by difficulty (reverse easiness)
+        ts.sort((a, b) => {
+            if (a.incorrect > b.incorrect) return -1;
+            if (b.incorrect > a.incorrect) return 1;
+            if (a.correct > b.correct) return 1;
+            if (b.correct > a.correct) return -1;
+            return b.size - a.size;
+        });
+        ts = ts.slice(0, 4);
+
+        console.log("====");
+        for (let t of ts) {
+            console.log(t.correct + "/" + t.incorrect + "/" + t.size + " - " + t.task.steps.join(" "))
+        }
+
+        return [ts.sampleGauss(),
+                ts.sampleGauss()];
+    }
+
     correctCount() {
-        return this.tasks.filter(e => e.correct()).length;
+        return Array.from(this.tasks.values()).map(e => e.correct).sum();
     }
 
     incorrectCount() {
-        return this.tasks.length - this.correctCount();
-    }
-
-    selectBest() {
-        return [this.tasks.sampleGauss(),
-                this.tasks.sampleGauss()];
+        return Array.from(this.tasks.values()).map(e => e.incorrect).sum();
     }
 }
 
@@ -308,9 +348,8 @@ class TaskBoard {
         this.actions.push(action);
     }
 
-    complete(task) {
-        let first = this.tasks.shift();
-        let rslt = new TaskAnnotated(first, task);
+    complete() {
+        let rslt = this.tasks.shift();
 
         let action = game => {
             let tweens = this.sprites
@@ -348,8 +387,6 @@ const PhaserGame = function (game) {
     this.map = null;
     this.layer = null;
     this.hero = null;
-
-    this.turnSpeed = 200;
 
     this.gridsize = 32;
 
@@ -481,9 +518,8 @@ PhaserGame.prototype = {
     },
 
     taskComplete: function () {
-        let done = this.taskBoard.complete(this.taskDoing);
-
-        this.taskLibrary.push(done);
+        let done = this.taskBoard.complete();
+        this.taskLibrary.push(done, this.taskDoing);
         this.taskBoard.push(this.taskLibrary.newTask());
         this.taskDoing = new TaskDoing();
     },
