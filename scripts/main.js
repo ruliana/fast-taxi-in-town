@@ -39,13 +39,28 @@ Array.prototype.sampleGauss = function () {
     return this[i];
 };
 
-function gauss() {
-    const a = 10; // vertical
-    const b = 0;  // middle
-    const c = 0.25; // width
-    const x = Math.random();
+class ScoreBoard {
+    constructor() {
+        this.points = 0;
+        this.lastPoint = 0;
+        this.tasks = 0;
+        this.steps = 0;
+    }
 
-    return Math.floor(a * Math.exp(-(Math.pow(x - b, 2) / (2 * Math.pow(c, 2)))));
+    push(task) {
+        let time = Date.now() - task.startInMillis;
+        console.log(task.size);
+        this.task += 1;
+        this.steps += task.size;
+
+        let points = Math.ceil(Math.pow(2, task.size) / (time / 1000));
+        this.points += points;
+        this.lastPoint = points;
+    }
+
+    toString() {
+        return this.points;
+    }
 }
 
 class CutPoint {
@@ -78,6 +93,7 @@ class CutPoint {
 
 class TaskDoing {
     constructor() {
+        this.startInMillis = Date.now();
         this.steps = [];
         this.moves = 0;
         this.misses = 0;
@@ -117,6 +133,10 @@ class TaskDoing {
         this.actions.push(action);
 
         return rslt;
+    }
+
+    get size() {
+        return this.steps.length;
     }
 
     matchesSteps(steps) {
@@ -390,6 +410,7 @@ const PhaserGame = function (game) {
 
     this.gridsize = 32;
 
+    this.scoreBoard = new ScoreBoard();
     this.taskBoard = new TaskBoard();
     this.taskDoing = new TaskDoing();
     this.taskLibrary = new TaskLibrary();
@@ -434,8 +455,9 @@ PhaserGame.prototype = {
         this.map.createLayer('decoration');
         this.map.createLayer('pancakes');
 
-        // Tasks
+        // Texts
         this.taskText = this.add.text(24, 48, "Orders:", {fontSize: '24px', fill: '#FFF'});
+        this.scoreText = this.add.text(400, 48, "Score: 0", {fontSize: '24px', fill: '#FFF'});
         this.debugText = this.add.text(160, 335, "Debug:", {fontSize: '16px', fill: '#FFF'});
 
         // Input
@@ -521,6 +543,17 @@ PhaserGame.prototype = {
         let done = this.taskBoard.complete();
         this.taskLibrary.push(done, this.taskDoing);
         this.taskBoard.push(this.taskLibrary.newTask());
+
+        if (done.matches(this.taskDoing)) {
+            this.scoreBoard.push(this.taskDoing);
+            this.scoreText.text = "Score: " + this.scoreBoard.toString();
+            let point = this.add.text(500, 48, this.scoreBoard.lastPoint, {fontSize: '24px', fill: '#FFF'});
+            point.anchor.set(0.5);
+            this.add.tween(point.scale).to({x: 3, y: 3}, 1000, "Linear", true);
+            this.add.tween(point).to({alpha: 0.1}, 2000, "Linear", true)
+                .onComplete.add(() => point.kill());
+        }
+
         this.taskDoing = new TaskDoing();
     },
 
