@@ -302,11 +302,11 @@ class TaskLibrary {
 
         // Sort by difficulty (reverse easiness)
         ts.sort((a, b) => {
-            if (a.incorrect > b.incorrect) return -1;
-            if (b.incorrect > a.incorrect) return 1;
-            if (a.correct > b.correct) return 1;
-            if (b.correct > a.correct) return -1;
-            return b.size - a.size;
+            if (a.size === b.size) {
+                return a.correct - b.correct;
+            } else {
+                return b.size - a.size;
+            }
         });
         ts = ts.slice(0, 4);
 
